@@ -1,0 +1,49 @@
+# Python / Backend
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+env/
+.env
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+*.coverage
+htmlcov/
+
+# Node.js / Frontend
+node_modules/
+.next/
+out/
+frontend/.env.local
+frontend/dist/
+frontend/build/
+
+# Environment files (never commit secrets)
+.env
+.env.local
+.env.*.local
+backend/.env
+!backend/.env.example
+!frontend/.env.local.example
+
+# OS
+.DS_Store
+Thumbs.db
+*.tmp
+*.swp
+
+# IDE
+.vscode/
+.idea/
+*.iml
+
+# Logs
+*.log
+logs/
+
+# Alembic
+backend/alembic/__pycache__/
