@@ -70,7 +70,7 @@ export default function MedicineTable({ medicines, onUpdated }: MedicineTablePro
         </thead>
         <tbody>
           {filtered.map(m => (
-            <tr key={m.id} style={{ borderBottom: '1px solid #e2e8f0', background: m.stock <= 10 ? '#fef3c7' : undefined }}>
+            <tr key={m.id} style={{ borderBottom: '1px solid #e2e8f0', background: m.stock === 0 ? '#fee2e2' : m.stock <= 10 ? '#fef3c7' : undefined }}>
               <td style={{ padding: '8px' }}>{m.name}</td>
               <td style={{ padding: '8px', textAlign: 'right' }}>
                 {editId === m.id
@@ -80,7 +80,9 @@ export default function MedicineTable({ medicines, onUpdated }: MedicineTablePro
               <td style={{ padding: '8px', textAlign: 'right' }}>
                 {editId === m.id
                   ? <input type="number" value={editStock} onChange={e => setEditStock(e.target.value)} style={{ width: '70px', padding: '4px' }} />
-                  : m.stock}
+                  : m.stock === 0
+                    ? <span style={{ color: '#dc2626', fontWeight: 600, fontSize: '12px', background: '#fecaca', padding: '2px 8px', borderRadius: '12px' }}>Out of Stock</span>
+                    : m.stock}
               </td>
               <td style={{ padding: '8px' }}>{m.company ?? '—'}</td>
               <td style={{ padding: '8px', textAlign: 'center' }}>

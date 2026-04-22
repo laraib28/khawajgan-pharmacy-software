@@ -35,36 +35,40 @@ async def upload_excel(
         }
 
     inserted = 0
-    extra_skipped = 0
+    updated = 0
 
     async with db.begin():
         for row in parsed.rows:
-            # Skip if medicine name already exists in DB (case-insensitive)
-            exists = await db.execute(
+            result = await db.execute(
                 select(Medicine).where(
                     func.lower(Medicine.name) == row["name"].lower()
                 )
             )
-            if exists.scalar_one_or_none():
-                extra_skipped += 1
-                continue
-            db.add(
-                Medicine(
-                    name=row["name"],
-                    price=row["price"],
-                    stock=row["stock"],
-                    company=row["company"],
-                    composition=row.get("composition"),
-                    type=row.get("type"),
-                    uom=row.get("uom"),
+            existing = result.scalar_one_or_none()
+            if existing:
+                existing.stock += row["stock"]
+                if row["price"] > 0:
+                    existing.price = row["price"]
+                updated += 1
+            else:
+                db.add(
+                    Medicine(
+                        name=row["name"],
+                        price=row["price"],
+                        stock=row["stock"],
+                        company=row["company"],
+                        composition=row.get("composition"),
+                        type=row.get("type"),
+                        uom=row.get("uom"),
+                    )
                 )
-            )
-            inserted += 1
+                inserted += 1
 
-    logger.info("Excel import: inserted=%s skipped=%s errors=%s", inserted, parsed.skipped + extra_skipped, len(parsed.errors))
+    logger.info("Excel import: inserted=%s updated=%s skipped=%s errors=%s", inserted, updated, parsed.skipped, len(parsed.errors))
 
     return {
         "inserted": inserted,
-        "skipped": parsed.skipped + extra_skipped,
+        "updated": updated,
+        "skipped": parsed.skipped,
         "errors": [{"row": e.row, "reason": e.reason} for e in parsed.errors],
     }

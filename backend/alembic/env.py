@@ -22,11 +22,16 @@ target_metadata = Base.metadata
 
 
 def get_url() -> str:
+    from urllib.parse import urlparse, urlencode, parse_qs, urlunparse
     url = os.getenv("DATABASE_URL", "")
-    # Alembic uses sync driver; replace asyncpg with psycopg2 for migrations
-    return url.replace("postgresql+asyncpg://", "postgresql+psycopg2://").replace(
-        "?ssl=require", ""
-    )
+    url = url.replace("postgresql+asyncpg://", "postgresql://")
+    url = url.replace("postgresql+asyncpg://", "postgresql://")
+    # Strip asyncpg-incompatible params; keep sslmode for psycopg2
+    parsed = urlparse(url)
+    params = parse_qs(parsed.query)
+    params.pop("channel_binding", None)
+    clean_query = urlencode({k: v[0] for k, v in params.items()})
+    return urlunparse(parsed._replace(query=clean_query))
 
 
 def run_migrations_offline() -> None:
