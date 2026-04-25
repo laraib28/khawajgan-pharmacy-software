@@ -10,6 +10,7 @@ interface Medicine {
   price: number;
   stock: number;
   company: string | null;
+  updated_at: string | null;
 }
 
 interface MedicineCreateOut extends Medicine {
