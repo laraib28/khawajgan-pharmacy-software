@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.schemas.medicine import MedicineCreate, MedicineCreateOut, MedicineOut, MedicineUpdate
+from app.schemas.medicine import MedicineCreate, MedicineCreateOut, MedicineOut, MedicineUpdate, InventoryLogOut
 from app.services import inventory_service
 
 router = APIRouter(prefix="/medicines", tags=["medicines"])
@@ -32,3 +32,19 @@ async def update_medicine(
     db: AsyncSession = Depends(get_db),
 ):
     return await inventory_service.update_medicine(db, medicine_id, data)
+
+
+@router.delete("/{medicine_id}", status_code=204)
+async def delete_medicine(
+    medicine_id: int,
+    db: AsyncSession = Depends(get_db),
+):
+    await inventory_service.delete_medicine(db, medicine_id)
+
+
+@router.get("/{medicine_id}/history", response_model=List[InventoryLogOut])
+async def get_medicine_history(
+    medicine_id: int,
+    db: AsyncSession = Depends(get_db),
+):
+    return await inventory_service.get_medicine_history(db, medicine_id)

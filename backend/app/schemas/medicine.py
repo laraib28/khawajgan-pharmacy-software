@@ -30,6 +30,7 @@ class MedicineOut(BaseModel):
     type: Optional[str]
     uom: Optional[str]
     created_at: datetime
+    updated_at: Optional[datetime]
 
     model_config = {"from_attributes": True}
 
@@ -37,3 +38,14 @@ class MedicineOut(BaseModel):
 class MedicineCreateOut(MedicineOut):
     receiving_invoice_no: str
     company_invoice_no: Optional[str]
+
+
+class InventoryLogOut(BaseModel):
+    id: int
+    medicine_name: str
+    field_changed: str
+    old_value: str
+    new_value: str
+    changed_at: datetime
+
+    model_config = {"from_attributes": True}

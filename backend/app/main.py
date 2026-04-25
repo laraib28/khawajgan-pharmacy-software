@@ -5,7 +5,7 @@ from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
 
 from app.utils.logger import get_logger
-from app.routers import medicines, sales, upload, dashboard, receiving
+from app.routers import medicines, sales, upload, dashboard, receiving, reports
 
 load_dotenv()
 logger = get_logger(__name__)
@@ -26,6 +26,7 @@ app.include_router(sales.router)
 app.include_router(upload.router)
 app.include_router(dashboard.router)
 app.include_router(receiving.router)
+app.include_router(reports.router)
 
 
 @app.get("/health")

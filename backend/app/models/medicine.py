@@ -23,6 +23,9 @@ class Medicine(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
+    updated_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
     sale_items: Mapped[list["SaleItem"]] = relationship(  # noqa: F821
         "SaleItem", back_populates="medicine"

@@ -1,9 +1,12 @@
+from datetime import datetime, timezone
 from typing import Optional
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import HTTPException
 
 from app.models.medicine import Medicine
+from app.models.inventory_log import InventoryLog
+from app.models.sale_item import SaleItem
 from app.schemas.medicine import MedicineCreate, MedicineUpdate
 from app.services import receiving_service
 from app.utils.logger import get_logger
@@ -22,7 +25,6 @@ async def list_medicines(
 
 
 async def create_medicine(db: AsyncSession, data: MedicineCreate) -> dict:
-    # Case-insensitive duplicate check
     exists = await db.execute(
         select(Medicine).where(func.lower(Medicine.name) == data.name.lower())
     )
@@ -41,7 +43,7 @@ async def create_medicine(db: AsyncSession, data: MedicineCreate) -> dict:
         uom=data.uom,
     )
     db.add(medicine)
-    await db.flush()  # get medicine.id before creating receiving record
+    await db.flush()
 
     receiving = await receiving_service.create_receiving(
         db,
@@ -71,11 +73,69 @@ async def update_medicine(
             status_code=404,
             detail=f"Medicine with id {medicine_id} not found",
         )
-    if data.price is not None:
+    if data.price is not None and data.price != medicine.price:
+        log = InventoryLog(
+            medicine_id=medicine.id,
+            medicine_name=medicine.name,
+            field_changed="price",
+            old_value=str(medicine.price),
+            new_value=str(data.price),
+        )
+        db.add(log)
         medicine.price = data.price
-    if data.stock is not None:
+
+    if data.stock is not None and data.stock != medicine.stock:
+        log = InventoryLog(
+            medicine_id=medicine.id,
+            medicine_name=medicine.name,
+            field_changed="stock",
+            old_value=str(medicine.stock),
+            new_value=str(data.stock),
+        )
+        db.add(log)
         medicine.stock = data.stock
+
+    medicine.updated_at = datetime.now(timezone.utc)
     await db.commit()
     await db.refresh(medicine)
     logger.info("Updated medicine id=%s", medicine.id)
     return medicine
+
+
+async def delete_medicine(db: AsyncSession, medicine_id: int) -> None:
+    result = await db.execute(select(Medicine).where(Medicine.id == medicine_id))
+    medicine = result.scalar_one_or_none()
+    if not medicine:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Medicine with id {medicine_id} not found",
+        )
+    # Prevent deletion if medicine has sales history
+    sale_check = await db.execute(
+        select(SaleItem).where(SaleItem.medicine_id == medicine_id).limit(1)
+    )
+    if sale_check.scalar_one_or_none():
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot delete medicine that has sales history. Archive it by setting stock to 0 instead.",
+        )
+    await db.delete(medicine)
+    await db.commit()
+    logger.info("Deleted medicine id=%s name=%s", medicine_id, medicine.name)
+
+
+async def get_medicine_history(
+    db: AsyncSession, medicine_id: int
+) -> list[InventoryLog]:
+    result = await db.execute(select(Medicine).where(Medicine.id == medicine_id))
+    if not result.scalar_one_or_none():
+        raise HTTPException(
+            status_code=404,
+            detail=f"Medicine with id {medicine_id} not found",
+        )
+    logs = await db.execute(
+        select(InventoryLog)
+        .where(InventoryLog.medicine_id == medicine_id)
+        .order_by(InventoryLog.changed_at.desc())
+    )
+    return list(logs.scalars().all())

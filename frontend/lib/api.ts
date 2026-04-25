@@ -33,6 +33,14 @@ export async function put<T>(path: string, body: unknown): Promise<T> {
   });
 }
 
+export async function del(path: string): Promise<void> {
+  const res = await fetch(`${BASE_URL}${path}`, { method: 'DELETE' });
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(error.detail ?? 'Delete failed');
+  }
+}
+
 export async function postForm<T>(path: string, formData: FormData): Promise<T> {
   const res = await fetch(`${BASE_URL}${path}`, {
     method: 'POST',
