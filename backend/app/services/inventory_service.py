@@ -7,6 +7,7 @@ from fastapi import HTTPException
 from app.models.medicine import Medicine
 from app.models.inventory_log import InventoryLog
 from app.models.sale_item import SaleItem
+from app.models.stock_receiving import StockReceiving
 from app.schemas.medicine import MedicineCreate, MedicineUpdate
 from app.services import receiving_service
 from app.utils.logger import get_logger
@@ -119,6 +120,13 @@ async def delete_medicine(db: AsyncSession, medicine_id: int) -> None:
             status_code=400,
             detail="Cannot delete medicine that has sales history. Archive it by setting stock to 0 instead.",
         )
+    # Delete related records first
+    receivings = await db.execute(select(StockReceiving).where(StockReceiving.medicine_id == medicine_id))
+    for r in receivings.scalars().all():
+        await db.delete(r)
+    logs = await db.execute(select(InventoryLog).where(InventoryLog.medicine_id == medicine_id))
+    for l in logs.scalars().all():
+        await db.delete(l)
     await db.delete(medicine)
     await db.commit()
     logger.info("Deleted medicine id=%s name=%s", medicine_id, medicine.name)
