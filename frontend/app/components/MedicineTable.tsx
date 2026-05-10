@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { put, del, get } from '@/lib/api';
+import { put, del, get, post } from '@/lib/api';
 
 interface Medicine {
   id: number;
@@ -46,6 +46,13 @@ export default function MedicineTable({ medicines, onUpdated }: MedicineTablePro
 
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
   const [deleteError, setDeleteError] = useState('');
+
+  const [restockMedicine, setRestockMedicine] = useState<Medicine | null>(null);
+  const [restockQty, setRestockQty] = useState('');
+  const [restockInvoice, setRestockInvoice] = useState('');
+  const [restockError, setRestockError] = useState('');
+  const [restockLoading, setRestockLoading] = useState(false);
+  const [restockSuccess, setRestockSuccess] = useState('');
 
   const filtered = medicines.filter(m =>
     m.name.toLowerCase().includes(search.toLowerCase())
@@ -97,6 +104,37 @@ export default function MedicineTable({ medicines, onUpdated }: MedicineTablePro
     }
   };
 
+  const openRestock = (m: Medicine) => {
+    setRestockMedicine(m);
+    setRestockQty('');
+    setRestockInvoice('');
+    setRestockError('');
+    setRestockSuccess('');
+  };
+
+  const confirmRestock = async () => {
+    if (!restockMedicine) return;
+    setRestockError('');
+    setRestockSuccess('');
+    if (!restockQty || Number(restockQty) <= 0) { setRestockError('Quantity 1 ya zyada honi chahiye'); return; }
+    setRestockLoading(true);
+    try {
+      await post('/receiving', {
+        medicine_id: restockMedicine.id,
+        quantity: Number(restockQty),
+        company_invoice_no: restockInvoice.trim() || null,
+      });
+      setRestockSuccess(`+${restockQty} stock add ho gaya`);
+      setRestockQty('');
+      setRestockInvoice('');
+      onUpdated();
+    } catch (e: unknown) {
+      setRestockError(e instanceof Error ? e.message : 'Restock failed');
+    } finally {
+      setRestockLoading(false);
+    }
+  };
+
   return (
     <div>
       <input
@@ -145,6 +183,7 @@ export default function MedicineTable({ medicines, onUpdated }: MedicineTablePro
                 ) : (
                   <>
                     <button onClick={() => startEdit(m)} style={{ color: '#1e40af', background: 'none', border: 'none', cursor: 'pointer', marginRight: '8px' }}>Edit</button>
+                    <button onClick={() => openRestock(m)} style={{ color: '#059669', background: 'none', border: 'none', cursor: 'pointer', marginRight: '8px' }}>Restock</button>
                     <button onClick={() => openHistory(m)} style={{ color: '#7c3aed', background: 'none', border: 'none', cursor: 'pointer', marginRight: '8px' }}>History</button>
                     <button onClick={() => { setDeleteConfirmId(m.id); setDeleteError(''); }} style={{ color: '#dc2626', background: 'none', border: 'none', cursor: 'pointer' }}>Delete</button>
                   </>
@@ -196,13 +235,56 @@ export default function MedicineTable({ medicines, onUpdated }: MedicineTablePro
         </div>
       )}
 
+      {/* Restock Modal */}
+      {restockMedicine && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }}>
+          <div style={{ background: '#fff', borderRadius: '8px', padding: '24px', maxWidth: '420px', width: '90vw' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#059669' }}>Restock — {restockMedicine.name}</h3>
+              <button onClick={() => setRestockMedicine(null)} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: '#64748b' }}>✕</button>
+            </div>
+            <div style={{ fontSize: '13px', color: '#475569', marginBottom: '12px' }}>
+              Current stock: <strong>{restockMedicine.stock}</strong>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '12px' }}>
+              <input
+                type="number"
+                min={1}
+                placeholder="Add quantity *"
+                value={restockQty}
+                onChange={e => setRestockQty(e.target.value)}
+                style={{ padding: '8px', border: '1px solid #cbd5e1', borderRadius: '4px' }}
+              />
+              <input
+                type="text"
+                placeholder="Company Invoice No (optional)"
+                value={restockInvoice}
+                onChange={e => setRestockInvoice(e.target.value)}
+                style={{ padding: '8px', border: '1px solid #cbd5e1', borderRadius: '4px' }}
+              />
+            </div>
+            {restockError && <p style={{ color: '#dc2626', marginBottom: '8px', fontSize: '13px' }}>{restockError}</p>}
+            {restockSuccess && <p style={{ color: '#059669', marginBottom: '8px', fontSize: '13px', fontWeight: 600 }}>{restockSuccess}</p>}
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+              <button onClick={() => setRestockMedicine(null)} style={{ padding: '8px 16px', border: '1px solid #cbd5e1', borderRadius: '4px', background: '#fff', cursor: 'pointer' }}>Close</button>
+              <button onClick={confirmRestock} disabled={restockLoading} style={{ padding: '8px 16px', background: '#059669', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 600 }}>
+                {restockLoading ? 'Saving...' : 'Add Stock'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Delete Confirmation Modal */}
       {deleteConfirmId && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }}>
           <div style={{ background: '#fff', borderRadius: '8px', padding: '24px', maxWidth: '400px', width: '90vw' }}>
             <h3 style={{ margin: '0 0 12px', fontSize: '16px', fontWeight: 700, color: '#dc2626' }}>Delete Medicine</h3>
             <p style={{ margin: '0 0 16px', color: '#374151' }}>
-              Are you sure you want to delete <strong>{medicines.find(m => m.id === deleteConfirmId)?.name}</strong>? This cannot be undone.
+              Kya aap <strong>{medicines.find(m => m.id === deleteConfirmId)?.name}</strong> delete karna chahte hain? Yeh wapis nahi ho sakta.
+            </p>
+            <p style={{ margin: '0 0 12px', color: '#64748b', fontSize: '13px' }}>
+              Note: Agar is medicine ki koi sale ho chuki hai to delete nahi hoga — aise mein stock 0 kar dein.
             </p>
             {deleteError && <p style={{ color: '#dc2626', marginBottom: '12px', fontSize: '13px' }}>{deleteError}</p>}
             <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>

@@ -2,6 +2,7 @@ from datetime import datetime, timezone
 from typing import Optional
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import HTTPException
 
 from app.models.stock_receiving import StockReceiving
 from app.utils.logger import get_logger
@@ -38,6 +39,34 @@ async def create_receiving(
     await db.flush()  # get id without committing (caller commits)
     logger.info("Created receiving record invoice=%s medicine=%s qty=%d", invoice_no, medicine_name, quantity)
     return record
+
+
+async def restock_medicine(
+    db: AsyncSession,
+    medicine_id: int,
+    quantity: int,
+    company_invoice_no: Optional[str] = None,
+) -> StockReceiving:
+    from app.models.medicine import Medicine
+    result = await db.execute(select(Medicine).where(Medicine.id == medicine_id))
+    medicine = result.scalar_one_or_none()
+    if not medicine:
+        raise HTTPException(status_code=404, detail=f"Medicine {medicine_id} not found")
+
+    medicine.stock += quantity
+    medicine.updated_at = datetime.now(timezone.utc)
+
+    receiving = await create_receiving(
+        db,
+        medicine_id=medicine.id,
+        medicine_name=medicine.name,
+        quantity=quantity,
+        company_invoice_no=company_invoice_no,
+    )
+    await db.commit()
+    await db.refresh(receiving)
+    logger.info("Restocked medicine id=%s +%d new_stock=%d", medicine_id, quantity, medicine.stock)
+    return receiving
 
 
 async def list_receivings(db: AsyncSession) -> list[StockReceiving]:

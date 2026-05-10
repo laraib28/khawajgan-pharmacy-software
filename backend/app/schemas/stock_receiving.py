@@ -1,6 +1,12 @@
 from datetime import datetime
 from typing import Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+
+
+class StockReceivingCreate(BaseModel):
+    medicine_id: int
+    quantity: int = Field(..., gt=0)
+    company_invoice_no: Optional[str] = Field(None, max_length=100)
 
 
 class StockReceivingOut(BaseModel):
