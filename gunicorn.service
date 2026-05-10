@@ -1,0 +1,13 @@
+[Unit]
+Description=Pharmacy Backend
+After=network.target
+
+[Service]
+User=root
+WorkingDirectory=/root/pharmacy-software-khawajgan/backend
+EnvironmentFile=/root/pharmacy-software-khawajgan/backend/.env
+ExecStart=/root/pharmacy-software-khawajgan/backend/.venv/bin/gunicorn -w 4 -k uvicorn.workers.UvicornWorker --bind 127.0.0.1:8000 main:app
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
