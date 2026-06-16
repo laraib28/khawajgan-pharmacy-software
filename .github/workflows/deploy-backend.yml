@@ -17,7 +17,7 @@ jobs:
           username: ${{ secrets.DO_USER }}
           key: ${{ secrets.DO_SSH_KEY }}
           script: |
-            cd /root/pharmacy-software-khawajgan/backend
+            cd /home/ubuntu/pharmacy-software-khawajgan/backend
             git pull origin main
             source .venv/bin/activate
             pip install -r requirements.txt --quiet
