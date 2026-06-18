@@ -23,6 +23,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <nav className="no-print" style={{ padding: '10px 24px', background: '#1e40af', display: 'flex', gap: '24px' }}>
           <Link href="/" style={{ color: '#fff', fontWeight: 600 }}>Dashboard</Link>
           <Link href="/billing" style={{ color: '#fff' }}>Medicine Billing</Link>
+          <Link href="/sales" style={{ color: '#fff' }}>Sale Records</Link>
           <Link href="/receiving" style={{ color: '#fff' }}>Medicine Receiving</Link>
           <Link href="/inventory" style={{ color: '#fff' }}>Inventory</Link>
           <Link href="/import" style={{ color: '#fff' }}>Import List</Link>

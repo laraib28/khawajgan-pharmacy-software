@@ -1,15 +1,46 @@
 from decimal import Decimal
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 from fastapi import HTTPException
 
 from app.models.medicine import Medicine
 from app.models.sale import Sale
 from app.models.sale_item import SaleItem
-from app.schemas.sale import InvoiceItem, InvoiceOut, SaleCreate
+from app.schemas.sale import InvoiceItem, InvoiceOut, SaleCreate, SaleItemOut, SaleOut
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
+
+
+async def list_sales(db: AsyncSession) -> list[SaleOut]:
+    result = await db.execute(
+        select(Sale)
+        .options(selectinload(Sale.items).selectinload(SaleItem.medicine))
+        .order_by(Sale.created_at.desc())
+    )
+    sales = result.unique().scalars().all()
+    out = []
+    for sale in sales:
+        items = [
+            SaleItemOut(
+                medicine_name=si.medicine.name if si.medicine else "—",
+                quantity=si.quantity,
+                price=si.price,
+                amount=si.price * si.quantity,
+            )
+            for si in sale.items
+        ]
+        out.append(
+            SaleOut(
+                sale_id=sale.id,
+                patient_name=sale.patient_name,
+                created_at=sale.created_at,
+                items=items,
+                total_amount=sale.total_amount,
+            )
+        )
+    return out
 
 
 async def create_sale(db: AsyncSession, data: SaleCreate) -> InvoiceOut:

@@ -27,3 +27,22 @@ class InvoiceOut(BaseModel):
     created_at: datetime
     items: List[InvoiceItem]
     total_amount: Decimal
+
+
+class SaleItemOut(BaseModel):
+    medicine_name: str
+    quantity: int
+    price: Decimal
+    amount: Decimal
+
+    model_config = {"from_attributes": True}
+
+
+class SaleOut(BaseModel):
+    sale_id: int
+    patient_name: str
+    created_at: datetime
+    items: List[SaleItemOut]
+    total_amount: Decimal
+
+    model_config = {"from_attributes": True}

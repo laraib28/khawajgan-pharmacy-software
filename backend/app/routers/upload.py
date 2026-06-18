@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.models.medicine import Medicine
+from app.services import receiving_service
 from app.utils.excel_parser import ParseError, parse_excel
 from app.utils.logger import get_logger
 
@@ -46,22 +47,37 @@ async def upload_excel(
             )
             existing = result.scalar_one_or_none()
             if existing:
-                existing.stock += row["stock"]
+                stock_added = row["stock"]
+                existing.stock += stock_added
                 if row["price"] > 0:
                     existing.price = row["price"]
+                if stock_added > 0:
+                    await receiving_service.create_receiving(
+                        db,
+                        medicine_id=existing.id,
+                        medicine_name=existing.name,
+                        quantity=stock_added,
+                    )
                 updated += 1
             else:
-                db.add(
-                    Medicine(
-                        name=row["name"],
-                        price=row["price"],
-                        stock=row["stock"],
-                        company=row["company"],
-                        composition=row.get("composition"),
-                        type=row.get("type"),
-                        uom=row.get("uom"),
-                    )
+                medicine = Medicine(
+                    name=row["name"],
+                    price=row["price"],
+                    stock=row["stock"],
+                    company=row["company"],
+                    composition=row.get("composition"),
+                    type=row.get("type"),
+                    uom=row.get("uom"),
                 )
+                db.add(medicine)
+                await db.flush()
+                if row["stock"] > 0:
+                    await receiving_service.create_receiving(
+                        db,
+                        medicine_id=medicine.id,
+                        medicine_name=medicine.name,
+                        quantity=row["stock"],
+                    )
                 inserted += 1
 
     logger.info("Excel import: inserted=%s updated=%s skipped=%s errors=%s", inserted, updated, parsed.skipped, len(parsed.errors))
