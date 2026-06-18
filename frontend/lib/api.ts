@@ -1,12 +1,14 @@
 // Use relative /api path so the browser calls Next.js (same origin).
-// Next.js rewrites /api/* → http://localhost:8000/* on the server side,
-// avoiding CORS issues when frontend is accessed via WSL2 IP.
+// Next.js rewrites /api/* → BACKEND_URL/* on the server side,
+// avoiding CORS issues and keeping the backend URL private.
+// cache: 'no-store' prevents Next.js 14 / Vercel CDN from caching API responses.
 const BASE_URL = '/api';
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE_URL}${path}`, {
-    headers: { 'Content-Type': 'application/json', ...init?.headers },
     ...init,
+    headers: { 'Content-Type': 'application/json', ...init?.headers },
+    cache: 'no-store',
   });
   if (!res.ok) {
     const error = await res.json().catch(() => ({ detail: res.statusText }));
@@ -34,7 +36,7 @@ export async function put<T>(path: string, body: unknown): Promise<T> {
 }
 
 export async function del(path: string): Promise<void> {
-  const res = await fetch(`${BASE_URL}${path}`, { method: 'DELETE' });
+  const res = await fetch(`${BASE_URL}${path}`, { method: 'DELETE', cache: 'no-store' });
   if (!res.ok) {
     const error = await res.json().catch(() => ({ detail: res.statusText }));
     throw new Error(error.detail ?? 'Delete failed');
