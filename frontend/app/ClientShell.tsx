@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
+import VoiceAssistant from '@/app/components/VoiceAssistant';
 
 const NAV_LINKS = [
   { href: '/', label: 'Dashboard', weight: 600 },
@@ -59,6 +60,7 @@ function Shell({ children }: { children: React.ReactNode }) {
         </div>
       </nav>
       <main style={{ padding: '24px' }}>{children}</main>
+      <VoiceAssistant />
     </>
   );
 }

@@ -7,7 +7,7 @@ from sqlalchemy import text
 
 from app.database import AsyncSessionLocal
 from app.utils.logger import get_logger
-from app.routers import medicines, sales, upload, dashboard, receiving, reports, chart_of_accounts, auth, journal_entries
+from app.routers import medicines, sales, upload, dashboard, receiving, reports, chart_of_accounts, auth, journal_entries, chatbot
 
 load_dotenv()
 logger = get_logger(__name__)
@@ -40,6 +40,7 @@ app.include_router(receiving.router)
 app.include_router(reports.router)
 app.include_router(chart_of_accounts.router)
 app.include_router(journal_entries.router)
+app.include_router(chatbot.router)
 
 
 @app.get("/health")
