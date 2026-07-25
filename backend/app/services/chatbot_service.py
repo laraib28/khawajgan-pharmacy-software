@@ -272,10 +272,13 @@ _AGENT: Agent[PharmacyContext] = Agent(
 
 
 @dataclass
-class VoicePipelineResult:
+class PipelineResult:
     transcript: str
     response_text: str
     audio_base64: str
+
+# Legacy alias
+VoicePipelineResult = PipelineResult
 
 
 async def run_voice_pipeline(
@@ -313,8 +316,39 @@ async def run_voice_pipeline(
     )
     audio_b64 = base64.b64encode(tts_resp.content).decode()
 
-    return VoicePipelineResult(
+    return PipelineResult(
         transcript=transcript,
+        response_text=response_text,
+        audio_base64=audio_b64,
+    )
+
+
+async def run_text_pipeline(
+    message: str,
+    user_id: int,
+    db: AsyncSession,
+) -> PipelineResult:
+    client = _get_client()
+    logger.info("TEXT user=%s message=%r", user_id, message[:100])
+
+    context = PharmacyContext(user_id=user_id, db=db)
+    result = await asyncio.wait_for(
+        Runner.run(_AGENT, message, context=context),
+        timeout=AGENT_TIMEOUT_SECONDS,
+    )
+    response_text = result.final_output
+    logger.info("TTS user=%s response=%r", user_id, response_text[:100])
+
+    tts_resp = await client.audio.speech.create(
+        model="tts-1",
+        voice="nova",
+        input=response_text,
+        response_format="mp3",
+    )
+    audio_b64 = base64.b64encode(tts_resp.content).decode()
+
+    return PipelineResult(
+        transcript=message,
         response_text=response_text,
         audio_base64=audio_b64,
     )
