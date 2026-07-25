@@ -2,7 +2,6 @@ from datetime import date, datetime, timezone
 from decimal import Decimal
 from typing import Optional
 
-from fastapi import HTTPException
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -25,19 +24,13 @@ _CODE_INVENTORY = "1003" # Medicine Inventory
 _CODE_PAYABLE = "2001"   # Accounts Payable (Suppliers)
 
 
-async def _resolve_account(db: AsyncSession, code: str) -> ChartOfAccount:
-    account = await db.scalar(
+async def _resolve_account(db: AsyncSession, code: str) -> Optional[ChartOfAccount]:
+    return await db.scalar(
         select(ChartOfAccount).where(
             ChartOfAccount.account_code == code,
             ChartOfAccount.is_active == True,  # noqa: E712
         )
     )
-    if not account:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Required account '{code}' not found or inactive — check Chart of Accounts setup",
-        )
-    return account
 
 
 def _validate_lines(lines: list) -> None:
@@ -144,9 +137,17 @@ async def post_sale_entry(
     created_by_id: int,
     entry_date: date,
     patient_name: str,
-) -> JournalEntry:
+) -> Optional[JournalEntry]:
     cash = await _resolve_account(db, _CODE_CASH)
     revenue = await _resolve_account(db, _CODE_REVENUE)
+    if not cash or not revenue:
+        logger.warning(
+            "Skipping sale journal entry: account %s not found — add accounts %s and %s to Chart of Accounts",
+            _CODE_CASH if not cash else _CODE_REVENUE,
+            _CODE_CASH,
+            _CODE_REVENUE,
+        )
+        return None
     return await _post_raw(
         db,
         description=f"Medicine sale — {patient_name}",
@@ -175,6 +176,13 @@ async def post_receiving_entry(
         return None
     inventory = await _resolve_account(db, _CODE_INVENTORY)
     payable = await _resolve_account(db, _CODE_PAYABLE)
+    if not inventory or not payable:
+        logger.warning(
+            "Skipping receiving journal entry: account not found — add accounts %s and %s to Chart of Accounts",
+            _CODE_INVENTORY,
+            _CODE_PAYABLE,
+        )
+        return None
     note = "Amount uses selling price as proxy — verify against supplier invoice" if price_is_estimated else None
     return await _post_raw(
         db,
