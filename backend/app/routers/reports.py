@@ -4,12 +4,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel
 
 from app.database import get_db
+from app.dependencies.auth import get_current_user
 from app.models.medicine import Medicine
 from app.models.sale import Sale
 from app.models.sale_item import SaleItem
 from app.models.stock_receiving import StockReceiving
 
-router = APIRouter(prefix="/reports", tags=["reports"])
+router = APIRouter(prefix="/reports", tags=["reports"], dependencies=[Depends(get_current_user)])
 
 
 class MonthlyMedicineReport(BaseModel):

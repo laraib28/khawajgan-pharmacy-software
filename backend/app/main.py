@@ -7,7 +7,7 @@ from sqlalchemy import text
 
 from app.database import AsyncSessionLocal
 from app.utils.logger import get_logger
-from app.routers import medicines, sales, upload, dashboard, receiving, reports, chart_of_accounts
+from app.routers import medicines, sales, upload, dashboard, receiving, reports, chart_of_accounts, auth
 
 load_dotenv()
 logger = get_logger(__name__)
@@ -31,6 +31,7 @@ app.add_middleware(
 )
 
 # Routers
+app.include_router(auth.router)
 app.include_router(medicines.router)
 app.include_router(sales.router)
 app.include_router(upload.router)

@@ -10,6 +10,18 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     headers: { 'Content-Type': 'application/json', ...init?.headers },
     cache: 'no-store',
   });
+
+  // On 401, try a token refresh once then retry the original request.
+  // Excludes auth endpoints to avoid infinite loops.
+  if (res.status === 401 && path !== '/auth/login' && path !== '/auth/refresh' && path !== '/auth/me') {
+    const refreshRes = await fetch(`${BASE_URL}/auth/refresh`, { method: 'POST', cache: 'no-store' });
+    if (refreshRes.ok) {
+      return request<T>(path, init);
+    }
+    if (typeof window !== 'undefined') window.location.href = '/login';
+    throw new Error('Session expired');
+  }
+
   if (!res.ok) {
     const error = await res.json().catch(() => ({ detail: res.statusText }));
     throw new Error(error.detail ?? 'Request failed');

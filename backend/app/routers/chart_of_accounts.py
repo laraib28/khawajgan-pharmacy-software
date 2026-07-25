@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
+from app.dependencies.auth import get_current_user
 from app.schemas.chart_of_account import (
     ChartOfAccountCreate,
     ChartOfAccountOut,
@@ -10,7 +11,7 @@ from app.schemas.chart_of_account import (
 )
 from app.services import chart_of_account_service
 
-router = APIRouter(prefix="/chart-of-accounts", tags=["chart-of-accounts"])
+router = APIRouter(prefix="/chart-of-accounts", tags=["chart-of-accounts"], dependencies=[Depends(get_current_user)])
 
 
 @router.get("", response_model=List[ChartOfAccountOut])

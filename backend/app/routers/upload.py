@@ -3,13 +3,14 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
+from app.dependencies.auth import get_current_user
 from app.models.medicine import Medicine
 from app.services import receiving_service
 from app.utils.excel_parser import ParseError, parse_excel
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
-router = APIRouter(tags=["import"])
+router = APIRouter(tags=["import"], dependencies=[Depends(get_current_user)])
 
 
 @router.post("/upload-excel")

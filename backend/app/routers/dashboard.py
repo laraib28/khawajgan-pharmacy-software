@@ -3,12 +3,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import APIRouter, Depends
 
 from app.database import get_db
+from app.dependencies.auth import get_current_user
 from app.models.medicine import Medicine
 from app.models.sale import Sale
 from app.schemas.dashboard import DashboardStats
 from app.schemas.medicine import MedicineOut
 
-router = APIRouter(tags=["dashboard"])
+router = APIRouter(tags=["dashboard"], dependencies=[Depends(get_current_user)])
 
 LOW_STOCK_THRESHOLD = 10
 
