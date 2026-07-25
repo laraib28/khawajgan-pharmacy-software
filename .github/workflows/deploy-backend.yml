@@ -24,7 +24,14 @@ jobs:
             source .venv/bin/activate
             pip install -r requirements.txt --quiet
             alembic upgrade head
-            kill $(pgrep -f "gunicorn.*app.main:app") 2>/dev/null || true
+            pkill -f "gunicorn.*app.main:app" || true
+            sleep 3
+            nohup /home/ubuntu/pharmacy-software-khawajgan/backend/.venv/bin/gunicorn \
+              -w 1 -k uvicorn.workers.UvicornWorker \
+              --bind 127.0.0.1:8000 \
+              --access-logfile /home/ubuntu/pharmacy-software-khawajgan/backend/gunicorn-access.log \
+              --error-logfile /home/ubuntu/pharmacy-software-khawajgan/backend/gunicorn-error.log \
+              app.main:app > /dev/null 2>&1 &
+            disown
             sleep 2
-            nohup gunicorn -w 1 -k uvicorn.workers.UvicornWorker --bind 127.0.0.1:8000 --access-logfile /home/ubuntu/pharmacy-software-khawajgan/backend/gunicorn-access.log --error-logfile /home/ubuntu/pharmacy-software-khawajgan/backend/gunicorn-error.log app.main:app &
             echo "✅ Deployment complete"
