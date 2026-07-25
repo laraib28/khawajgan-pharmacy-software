@@ -46,7 +46,9 @@ async def list_sales(db: AsyncSession) -> list[SaleOut]:
 
 
 async def create_sale(db: AsyncSession, data: SaleCreate, created_by_id: int) -> InvoiceOut:
-    async with db.begin():
+    # Auth dependency already began an implicit transaction on this session —
+    # use it directly and commit explicitly at the end.
+    try:
         invoice_items: list[InvoiceItem] = []
         total = Decimal("0")
 
@@ -117,6 +119,14 @@ async def create_sale(db: AsyncSession, data: SaleCreate, created_by_id: int) ->
             entry_date=datetime.now(timezone.utc).date(),
             patient_name=data.patient_name,
         )
+
+        await db.commit()
+    except HTTPException:
+        await db.rollback()
+        raise
+    except Exception:
+        await db.rollback()
+        raise
 
     await db.refresh(sale)
     logger.info(
