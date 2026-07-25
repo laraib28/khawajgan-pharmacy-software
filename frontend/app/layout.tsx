@@ -28,6 +28,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <Link href="/inventory" style={{ color: '#fff' }}>Inventory</Link>
           <Link href="/import" style={{ color: '#fff' }}>Import List</Link>
           <Link href="/reports" style={{ color: '#fff' }}>Monthly Report</Link>
+          <Link href="/chart-of-accounts" style={{ color: '#fff' }}>Chart of Accounts</Link>
         </nav>
         <main style={{ padding: '24px' }}>{children}</main>
       </body>

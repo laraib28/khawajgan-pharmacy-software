@@ -43,6 +43,53 @@ export async function del(path: string): Promise<void> {
   }
 }
 
+// Chart of Accounts
+export interface AccountNode {
+  id: number;
+  account_code: string;
+  account_name: string;
+  account_type: string;
+  parent_account_id: number | null;
+  normal_balance: string;
+  description: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string | null;
+  children: AccountNode[];
+}
+
+export interface AccountCreate {
+  account_code: string;
+  account_name: string;
+  account_type: string;
+  parent_account_id?: number | null;
+  description?: string | null;
+}
+
+export interface AccountUpdate {
+  account_name?: string;
+  description?: string | null;
+  is_active?: boolean;
+}
+
+export async function getAccounts(params?: { account_type?: string; is_active?: boolean }): Promise<AccountNode[]> {
+  const defined = params ? Object.entries(params).filter(([, v]) => v !== undefined) as [string, string][] : [];
+  const qs = defined.length ? '?' + new URLSearchParams(defined).toString() : '';
+  return get<AccountNode[]>(`/chart-of-accounts${qs}`);
+}
+
+export async function createAccount(data: AccountCreate): Promise<AccountNode> {
+  return post<AccountNode>('/chart-of-accounts', data);
+}
+
+export async function updateAccount(id: number, data: AccountUpdate): Promise<AccountNode> {
+  return put<AccountNode>(`/chart-of-accounts/${id}`, data);
+}
+
+export async function deactivateAccount(id: number): Promise<void> {
+  return del(`/chart-of-accounts/${id}`);
+}
+
 export async function postForm<T>(path: string, formData: FormData): Promise<T> {
   const res = await fetch(`${BASE_URL}${path}`, {
     method: 'POST',
