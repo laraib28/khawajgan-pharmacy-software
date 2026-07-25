@@ -1,10 +1,12 @@
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
+from decimal import Decimal
 from typing import Optional
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import HTTPException
 
 from app.models.stock_receiving import StockReceiving
+from app.services import journal_entry_service
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -36,7 +38,7 @@ async def create_receiving(
         quantity=quantity,
     )
     db.add(record)
-    await db.flush()  # get id without committing (caller commits)
+    await db.flush()
     logger.info("Created receiving record invoice=%s medicine=%s qty=%d", invoice_no, medicine_name, quantity)
     return record
 
@@ -46,6 +48,8 @@ async def restock_medicine(
     medicine_id: int,
     quantity: int,
     company_invoice_no: Optional[str] = None,
+    created_by_id: Optional[int] = None,
+    unit_price: Optional[Decimal] = None,
 ) -> StockReceiving:
     from app.models.medicine import Medicine
     result = await db.execute(select(Medicine).where(Medicine.id == medicine_id))
@@ -63,6 +67,20 @@ async def restock_medicine(
         quantity=quantity,
         company_invoice_no=company_invoice_no,
     )
+
+    if created_by_id is not None:
+        price = unit_price if unit_price is not None else Decimal(str(medicine.price))
+        amount = price * quantity
+        await journal_entry_service.post_receiving_entry(
+            db,
+            receiving_id=receiving.id,
+            medicine_name=medicine.name,
+            amount=amount,
+            created_by_id=created_by_id,
+            entry_date=date.today(),
+            price_is_estimated=(unit_price is None),
+        )
+
     await db.commit()
     await db.refresh(receiving)
     logger.info("Restocked medicine id=%s +%d new_stock=%d", medicine_id, quantity, medicine.stock)

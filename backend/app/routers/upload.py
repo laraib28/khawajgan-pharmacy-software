@@ -1,3 +1,5 @@
+from datetime import date
+from decimal import Decimal
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -5,7 +7,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.dependencies.auth import get_current_user
 from app.models.medicine import Medicine
-from app.services import receiving_service
+from app.models.user import User
+from app.services import journal_entry_service, receiving_service
 from app.utils.excel_parser import ParseError, parse_excel
 from app.utils.logger import get_logger
 
@@ -17,6 +20,7 @@ router = APIRouter(tags=["import"], dependencies=[Depends(get_current_user)])
 async def upload_excel(
     file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     if not file.filename or not file.filename.endswith(".xlsx"):
         raise HTTPException(status_code=415, detail="Only .xlsx files are accepted")
@@ -38,6 +42,7 @@ async def upload_excel(
 
     inserted = 0
     updated = 0
+    today = date.today()
 
     async with db.begin():
         for row in parsed.rows:
@@ -53,11 +58,21 @@ async def upload_excel(
                 if row["price"] > 0:
                     existing.price = row["price"]
                 if stock_added > 0:
-                    await receiving_service.create_receiving(
+                    rec = await receiving_service.create_receiving(
                         db,
                         medicine_id=existing.id,
                         medicine_name=existing.name,
                         quantity=stock_added,
+                    )
+                    unit_price = Decimal(str(row["price"])) if row["price"] > 0 else Decimal(str(existing.price))
+                    await journal_entry_service.post_receiving_entry(
+                        db,
+                        receiving_id=rec.id,
+                        medicine_name=existing.name,
+                        amount=unit_price * stock_added,
+                        created_by_id=current_user.id,
+                        entry_date=today,
+                        price_is_estimated=True,
                     )
                 updated += 1
             else:
@@ -73,11 +88,21 @@ async def upload_excel(
                 db.add(medicine)
                 await db.flush()
                 if row["stock"] > 0:
-                    await receiving_service.create_receiving(
+                    rec = await receiving_service.create_receiving(
                         db,
                         medicine_id=medicine.id,
                         medicine_name=medicine.name,
                         quantity=row["stock"],
+                    )
+                    unit_price = Decimal(str(row["price"])) if row["price"] > 0 else Decimal("0")
+                    await journal_entry_service.post_receiving_entry(
+                        db,
+                        receiving_id=rec.id,
+                        medicine_name=medicine.name,
+                        amount=unit_price * row["stock"],
+                        created_by_id=current_user.id,
+                        entry_date=today,
+                        price_is_estimated=True,
                     )
                 inserted += 1
 

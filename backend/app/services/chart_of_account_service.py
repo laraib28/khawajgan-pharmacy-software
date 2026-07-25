@@ -1,10 +1,12 @@
 from datetime import datetime, timezone
+from decimal import Decimal
 from typing import Optional
 from fastapi import HTTPException
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.chart_of_account import ChartOfAccount
+from app.models.journal_entry import JournalEntryLine
 from app.schemas.chart_of_account import (
     AccountType,
     ACCOUNT_TYPE_RANGES,
@@ -77,10 +79,56 @@ def _build_tree(accounts: list[ChartOfAccount]) -> list[ChartOfAccountOut]:
     return roots
 
 
+async def _fetch_balances(db: AsyncSession) -> dict[int, Decimal]:
+    """Return {account_id: balance} using a single aggregate query."""
+    rows = await db.execute(
+        select(
+            JournalEntryLine.account_id,
+            func.coalesce(func.sum(JournalEntryLine.debit_amount), 0).label("td"),
+            func.coalesce(func.sum(JournalEntryLine.credit_amount), 0).label("tc"),
+        ).group_by(JournalEntryLine.account_id)
+    )
+    return {r.account_id: (Decimal(str(r.td)), Decimal(str(r.tc))) for r in rows}
+
+
+def _account_to_out_with_balance(
+    a: ChartOfAccount,
+    balances: dict[int, tuple[Decimal, Decimal]],
+    children: list[ChartOfAccountOut] | None = None,
+) -> ChartOfAccountOut:
+    pair = balances.get(a.id)
+    if pair is not None:
+        td, tc = pair
+        bal = (td - tc) if a.normal_balance == "debit" else (tc - td)
+    else:
+        bal = Decimal("0")
+    out = _account_to_out(a, children)
+    out.balance = bal
+    return out
+
+
+def _build_tree_with_balance(
+    accounts: list[ChartOfAccount],
+    balances: dict[int, tuple[Decimal, Decimal]],
+) -> list[ChartOfAccountOut]:
+    id_map: dict[int, ChartOfAccountOut] = {
+        a.id: _account_to_out_with_balance(a, balances) for a in accounts
+    }
+    roots: list[ChartOfAccountOut] = []
+    for a in accounts:
+        node = id_map[a.id]
+        if a.parent_account_id is None or a.parent_account_id not in id_map:
+            roots.append(node)
+        else:
+            id_map[a.parent_account_id].children.append(node)
+    return roots
+
+
 async def list_accounts(
     db: AsyncSession,
     account_type: Optional[str] = None,
     is_active: Optional[bool] = None,
+    include_balance: bool = False,
 ) -> list[ChartOfAccountOut]:
     stmt = select(ChartOfAccount).order_by(ChartOfAccount.account_code)
     if account_type:
@@ -88,7 +136,11 @@ async def list_accounts(
     if is_active is not None:
         stmt = stmt.where(ChartOfAccount.is_active == is_active)
     result = await db.execute(stmt)
-    return _build_tree(list(result.scalars().all()))
+    accounts = list(result.scalars().all())
+    if include_balance:
+        balances = await _fetch_balances(db)
+        return _build_tree_with_balance(accounts, balances)
+    return _build_tree(accounts)
 
 
 async def _fetch_children(db: AsyncSession, account_id: int) -> list[ChartOfAccountOut]:

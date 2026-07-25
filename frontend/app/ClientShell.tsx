@@ -14,6 +14,7 @@ const NAV_LINKS = [
   { href: '/import', label: 'Import List', weight: 400 },
   { href: '/reports', label: 'Monthly Report', weight: 400 },
   { href: '/chart-of-accounts', label: 'Chart of Accounts', weight: 400 },
+  { href: '/journal-entries', label: 'Journal Entries', weight: 400 },
 ];
 
 function Shell({ children }: { children: React.ReactNode }) {

@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from decimal import Decimal
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -8,6 +9,7 @@ from app.models.medicine import Medicine
 from app.models.sale import Sale
 from app.models.sale_item import SaleItem
 from app.schemas.sale import InvoiceItem, InvoiceOut, SaleCreate, SaleItemOut, SaleOut
+from app.services import journal_entry_service
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -43,7 +45,7 @@ async def list_sales(db: AsyncSession) -> list[SaleOut]:
     return out
 
 
-async def create_sale(db: AsyncSession, data: SaleCreate) -> InvoiceOut:
+async def create_sale(db: AsyncSession, data: SaleCreate, created_by_id: int) -> InvoiceOut:
     async with db.begin():
         invoice_items: list[InvoiceItem] = []
         total = Decimal("0")
@@ -70,7 +72,7 @@ async def create_sale(db: AsyncSession, data: SaleCreate) -> InvoiceOut:
                     ),
                 )
 
-        # Phase 2: deduct stock, build invoice items (re-fetch already locked)
+        # Phase 2: deduct stock, build invoice items
         for item in data.items:
             result = await db.execute(
                 select(Medicine)
@@ -93,7 +95,7 @@ async def create_sale(db: AsyncSession, data: SaleCreate) -> InvoiceOut:
         # Phase 3: persist sale record
         sale = Sale(patient_name=data.patient_name, total_amount=total)
         db.add(sale)
-        await db.flush()  # get sale.id before sale_items insert
+        await db.flush()
 
         for idx, item in enumerate(data.items):
             db.add(
@@ -104,8 +106,18 @@ async def create_sale(db: AsyncSession, data: SaleCreate) -> InvoiceOut:
                     price=invoice_items[idx].price,
                 )
             )
+        await db.flush()
 
-    # Transaction committed; refresh to get created_at
+        # Phase 4: post journal entry (same transaction — rolls back if this fails)
+        await journal_entry_service.post_sale_entry(
+            db,
+            sale_id=sale.id,
+            total=total,
+            created_by_id=created_by_id,
+            entry_date=datetime.now(timezone.utc).date(),
+            patient_name=data.patient_name,
+        )
+
     await db.refresh(sale)
     logger.info(
         "Sale id=%s patient=%s total=%s items=%s",

@@ -18,9 +18,12 @@ router = APIRouter(prefix="/chart-of-accounts", tags=["chart-of-accounts"], depe
 async def list_accounts(
     account_type: Optional[str] = None,
     is_active: Optional[bool] = None,
+    include_balance: bool = False,
     db: AsyncSession = Depends(get_db),
 ):
-    return await chart_of_account_service.list_accounts(db, account_type=account_type, is_active=is_active)
+    return await chart_of_account_service.list_accounts(
+        db, account_type=account_type, is_active=is_active, include_balance=include_balance
+    )
 
 
 @router.get("/{account_id}", response_model=ChartOfAccountOut)

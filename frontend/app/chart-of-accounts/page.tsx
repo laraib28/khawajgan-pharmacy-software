@@ -206,9 +206,16 @@ function AccountRow({ account, depth, color, onEdit, onDeactivate }: AccountRowP
           {account.description ?? <span style={{ color: '#cbd5e1' }}>—</span>}
         </td>
         <td style={{ padding: '10px 16px' }}>
-          <span style={{ display: 'inline-block', padding: '2px 8px', borderRadius: '4px', fontSize: '12px', fontWeight: 700, fontFamily: 'monospace', ...balanceStyle(account.normal_balance) }}>
-            {balanceLabel(account.normal_balance)}
-          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ display: 'inline-block', padding: '2px 8px', borderRadius: '4px', fontSize: '12px', fontWeight: 700, fontFamily: 'monospace', ...balanceStyle(account.normal_balance) }}>
+              {balanceLabel(account.normal_balance)}
+            </span>
+            {account.balance != null && (
+              <span style={{ fontSize: '13px', fontFamily: 'monospace', color: account.balance >= 0 ? '#374151' : '#dc2626' }}>
+                {account.balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </span>
+            )}
+          </div>
         </td>
         <td style={{ padding: '10px 16px' }}>
           <span style={{
@@ -262,7 +269,7 @@ export default function ChartOfAccountsPage() {
 
   const fetchAccounts = useCallback(async () => {
     setLoading(true);
-    try { setAccounts(await getAccounts()); }
+    try { setAccounts(await getAccounts({ include_balance: true })); }
     finally { setLoading(false); }
   }, []);
 

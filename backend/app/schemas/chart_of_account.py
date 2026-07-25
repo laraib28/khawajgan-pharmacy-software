@@ -1,4 +1,5 @@
 from datetime import datetime
+from decimal import Decimal
 from enum import Enum
 from typing import Optional
 from pydantic import BaseModel, Field
@@ -54,6 +55,7 @@ class ChartOfAccountOut(BaseModel):
     is_active: bool
     created_at: datetime
     updated_at: Optional[datetime]
+    balance: Optional[Decimal] = None
     children: list["ChartOfAccountOut"] = []
 
     model_config = {"from_attributes": True}

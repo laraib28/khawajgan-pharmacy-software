@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.dependencies.auth import get_current_user
+from app.models.user import User
 from app.schemas.stock_receiving import StockReceivingCreate, StockReceivingOut
 from app.services import receiving_service
 
@@ -16,7 +17,12 @@ async def list_receivings(db: AsyncSession = Depends(get_db)):
 
 
 @router.post("", response_model=StockReceivingOut, status_code=201)
-async def add_receiving(data: StockReceivingCreate, db: AsyncSession = Depends(get_db)):
+async def add_receiving(
+    data: StockReceivingCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     return await receiving_service.restock_medicine(
-        db, data.medicine_id, data.quantity, data.company_invoice_no
+        db, data.medicine_id, data.quantity, data.company_invoice_no,
+        created_by_id=current_user.id,
     )
