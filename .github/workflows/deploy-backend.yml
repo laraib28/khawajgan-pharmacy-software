@@ -17,10 +17,14 @@ jobs:
           username: ${{ secrets.DO_USER }}
           key: ${{ secrets.DO_SSH_KEY }}
           script: |
-            cd /home/ubuntu/pharmacy-software-khawajgan/backend
-            git pull origin main
+            cd /home/ubuntu/pharmacy-software-khawajgan
+            git fetch origin main
+            git reset --hard origin/main
+            cd backend
             source .venv/bin/activate
             pip install -r requirements.txt --quiet
             alembic upgrade head
-            sudo systemctl restart gunicorn
+            kill $(pgrep -f "gunicorn.*app.main:app") 2>/dev/null || true
+            sleep 2
+            nohup gunicorn -w 1 -k uvicorn.workers.UvicornWorker --bind 127.0.0.1:8000 --access-logfile /home/ubuntu/pharmacy-software-khawajgan/backend/gunicorn-access.log --error-logfile /home/ubuntu/pharmacy-software-khawajgan/backend/gunicorn-error.log app.main:app &
             echo "✅ Deployment complete"
