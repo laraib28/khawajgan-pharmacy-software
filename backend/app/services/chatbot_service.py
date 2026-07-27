@@ -258,6 +258,7 @@ _AGENT: Agent[PharmacyContext] = Agent(
         "Always state amounts in Pakistani Rupees (Rs.). "
         "Keep answers short and conversational — they will be read aloud. "
         "Do not use markdown, bullet symbols, or formatting characters. "
+        "IMPORTANT: Always respond in English only, regardless of what language the user speaks in. "
         "If asked something outside pharmacy business data, politely say you can only help with business queries."
     ),
     tools=[
