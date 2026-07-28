@@ -3,6 +3,10 @@ import base64
 import logging
 import os
 from dataclasses import dataclass
+from pathlib import Path
+from dotenv import load_dotenv
+
+load_dotenv(Path(__file__).parent.parent.parent / '.env')
 from datetime import date, timedelta
 from decimal import Decimal
 from io import BytesIO
