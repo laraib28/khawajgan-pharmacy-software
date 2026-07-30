@@ -88,7 +88,7 @@ export default function InventoryPage() {
               placeholder={placeholder}
               value={form[key as keyof typeof form]}
               onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))}
-              style={{ padding: '8px', border: '1px solid #cbd5e1', borderRadius: '4px', width: '160px' }}
+              style={{ padding: '8px', border: '1px solid #cbd5e1', borderRadius: '4px', width: '100%', maxWidth: '180px', boxSizing: 'border-box' }}
             />
           ))}
           <button

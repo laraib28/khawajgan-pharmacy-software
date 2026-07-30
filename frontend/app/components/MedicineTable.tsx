@@ -141,11 +141,12 @@ export default function MedicineTable({ medicines, onUpdated }: MedicineTablePro
         placeholder="Search by name..."
         value={search}
         onChange={e => setSearch(e.target.value)}
-        style={{ padding: '8px', border: '1px solid #cbd5e1', borderRadius: '4px', marginBottom: '12px', width: '280px' }}
+        style={{ padding: '8px', border: '1px solid #cbd5e1', borderRadius: '4px', marginBottom: '12px', width: '100%', maxWidth: '320px', boxSizing: 'border-box' }}
       />
       {error && <div style={{ color: '#ef4444', marginBottom: '8px' }}>{error}</div>}
 
-      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
+      <div style={{ overflowX: 'auto' }}>
+      <table style={{ width: '100%', minWidth: '640px', borderCollapse: 'collapse', fontSize: '14px' }}>
         <thead>
           <tr style={{ background: '#e2e8f0' }}>
             <th style={{ padding: '8px', textAlign: 'left' }}>Name</th>
@@ -196,11 +197,12 @@ export default function MedicineTable({ medicines, onUpdated }: MedicineTablePro
           )}
         </tbody>
       </table>
+      </div>
 
       {/* History Modal */}
       {historyMedicine && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }}>
-          <div style={{ background: '#fff', borderRadius: '8px', padding: '24px', minWidth: '500px', maxWidth: '90vw', maxHeight: '80vh', overflow: 'auto' }}>
+          <div style={{ background: '#fff', borderRadius: '8px', padding: '24px', width: 'min(500px, 90vw)', maxHeight: '80vh', overflow: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
               <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700 }}>Update History — {historyMedicine.name}</h3>
               <button onClick={() => setHistoryMedicine(null)} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: '#64748b' }}>✕</button>

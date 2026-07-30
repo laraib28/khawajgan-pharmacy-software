@@ -96,7 +96,8 @@ export default function ReportsPage() {
             </div>
           </div>
 
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
+          <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', minWidth: '480px', borderCollapse: 'collapse', fontSize: '14px' }}>
             <thead>
               <tr style={{ background: '#e2e8f0' }}>
                 <th style={{ padding: '10px 8px', textAlign: 'left' }}>Medicine Name</th>
@@ -135,6 +136,7 @@ export default function ReportsPage() {
               )}
             </tbody>
           </table>
+          </div>
         </>
       )}
     </div>

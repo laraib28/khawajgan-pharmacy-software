@@ -54,7 +54,8 @@ export default function DashboardPage() {
         {stats.low_stock_medicines.length === 0 ? (
           <p style={{ color: '#059669' }}>✓ All medicines are well-stocked.</p>
         ) : (
-          <table style={{ borderCollapse: 'collapse', fontSize: '14px' }}>
+          <div style={{ overflowX: 'auto' }}>
+          <table style={{ borderCollapse: 'collapse', fontSize: '14px', minWidth: '360px' }}>
             <thead>
               <tr style={{ background: '#fef3c7' }}>
                 <th style={{ padding: '8px 16px', textAlign: 'left' }}>Name</th>
@@ -72,6 +73,7 @@ export default function DashboardPage() {
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </div>
     </div>

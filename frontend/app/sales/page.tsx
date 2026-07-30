@@ -73,7 +73,7 @@ export default function SalesHistoryPage() {
           placeholder="Patient name ya sale ID se search karein..."
           value={search}
           onChange={e => setSearch(e.target.value)}
-          style={{ padding: '8px 12px', border: '1px solid #cbd5e1', borderRadius: '6px', width: '320px', fontSize: '14px' }}
+          style={{ padding: '8px 12px', border: '1px solid #cbd5e1', borderRadius: '6px', width: '100%', maxWidth: '360px', fontSize: '14px', boxSizing: 'border-box' }}
         />
       </div>
 
@@ -84,8 +84,8 @@ export default function SalesHistoryPage() {
       ) : filtered.length === 0 ? (
         <div style={{ color: '#94a3b8', padding: '24px', textAlign: 'center' }}>Koi sale record nahi mila</div>
       ) : (
-        <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
+        <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px', overflowX: 'auto' }}>
+          <table style={{ width: '100%', minWidth: '540px', borderCollapse: 'collapse', fontSize: '14px' }}>
             <thead>
               <tr style={{ background: '#e2e8f0' }}>
                 <th style={{ padding: '10px 12px', textAlign: 'left', width: '40px' }}></th>

@@ -118,12 +118,12 @@ export default function BillingForm({ onSuccess }: BillingFormProps) {
           value={state.patientName}
           onChange={e => dispatch({ type: 'SET_PATIENT', value: e.target.value })}
           placeholder="Enter patient name"
-          style={{ padding: '8px', border: '1px solid #cbd5e1', borderRadius: '4px', width: '300px' }}
+          style={{ padding: '8px', border: '1px solid #cbd5e1', borderRadius: '4px', width: '100%', maxWidth: '360px', boxSizing: 'border-box' }}
         />
       </div>
 
       {state.items.map((item, idx) => (
-        <div key={idx} style={{ display: 'flex', gap: '8px', marginBottom: '8px', alignItems: 'center' }}>
+        <div key={idx} style={{ display: 'flex', gap: '8px', marginBottom: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
           <select
             value={item.medicineId}
             onChange={e => {
