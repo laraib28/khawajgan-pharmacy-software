@@ -7,14 +7,17 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 load_dotenv(Path(__file__).parent.parent.parent / '.env')
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
+from zoneinfo import ZoneInfo
+
+_PKT = ZoneInfo("Asia/Karachi")
 from decimal import Decimal
 from io import BytesIO
 from typing import Optional
 
 from openai import AsyncOpenAI
 from agents import Agent, Runner, function_tool, RunContextWrapper
-from sqlalchemy import cast, func, select
+from sqlalchemy import cast, func, select, text
 from sqlalchemy import Date as SADate
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -48,7 +51,7 @@ class PharmacyContext:
 
 
 def _parse_date_range(date_range: str) -> tuple[date, date]:
-    today = date.today()
+    today = datetime.now(_PKT).date()
     dr = date_range.lower().strip()
     if dr in ("today", ""):
         return today, today
@@ -85,8 +88,8 @@ async def get_sales_summary(ctx: RunContextWrapper[PharmacyContext], date_range:
             func.count(Sale.id).label("cnt"),
             func.coalesce(func.sum(Sale.total_amount), 0).label("total"),
         ).where(
-            cast(Sale.created_at, SADate) >= start,
-            cast(Sale.created_at, SADate) <= end,
+            func.date(func.timezone('Asia/Karachi', Sale.created_at)) >= start,
+            func.date(func.timezone('Asia/Karachi', Sale.created_at)) <= end,
         )
     )).one()
 
@@ -168,8 +171,8 @@ async def get_profit_summary(ctx: RunContextWrapper[PharmacyContext], date_range
 
     revenue = Decimal(str((await db.execute(
         select(func.coalesce(func.sum(Sale.total_amount), 0)).where(
-            cast(Sale.created_at, SADate) >= start,
-            cast(Sale.created_at, SADate) <= end,
+            func.date(func.timezone('Asia/Karachi', Sale.created_at)) >= start,
+            func.date(func.timezone('Asia/Karachi', Sale.created_at)) <= end,
         )
     )).scalar_one()))
 
@@ -235,8 +238,8 @@ async def get_top_selling_medicines(
         .join(SaleItem, SaleItem.medicine_id == Medicine.id)
         .join(Sale, Sale.id == SaleItem.sale_id)
         .where(
-            cast(Sale.created_at, SADate) >= start,
-            cast(Sale.created_at, SADate) <= end,
+            func.date(func.timezone('Asia/Karachi', Sale.created_at)) >= start,
+            func.date(func.timezone('Asia/Karachi', Sale.created_at)) <= end,
         )
         .group_by(Medicine.name)
         .order_by(func.sum(SaleItem.quantity).desc())
