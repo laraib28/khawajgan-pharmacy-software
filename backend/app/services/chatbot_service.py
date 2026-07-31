@@ -17,8 +17,7 @@ from typing import Optional
 
 from openai import AsyncOpenAI
 from agents import Agent, Runner, function_tool, RunContextWrapper
-from sqlalchemy import cast, func, select, text
-from sqlalchemy import Date as SADate
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.chart_of_account import ChartOfAccount
@@ -26,6 +25,7 @@ from app.models.journal_entry import JournalEntry, JournalEntryLine
 from app.models.medicine import Medicine
 from app.models.sale import Sale
 from app.models.sale_item import SaleItem
+from app.models.stock_receiving import StockReceiving
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +33,7 @@ AGENT_TIMEOUT_SECONDS = 60
 LOW_STOCK_THRESHOLD = 10
 
 _openai_client: AsyncOpenAI | None = None
+
 
 def _get_client() -> AsyncOpenAI:
     global _openai_client
@@ -75,13 +76,14 @@ def _parse_date_range(date_range: str) -> tuple[date, date]:
         return today, today
 
 
+# ── Existing tools ────────────────────────────────────────────────────────────
+
 @function_tool
 async def get_sales_summary(ctx: RunContextWrapper[PharmacyContext], date_range: str) -> str:
     """Get total sales amount and transaction count for a time period (today, this week, this month, last month, this year, or YYYY-MM-DD)."""
     db = ctx.context.db
-    user_id = ctx.context.user_id
     start, end = _parse_date_range(date_range)
-    logger.info("tool=get_sales_summary user=%s range=%s/%s", user_id, start, end)
+    logger.info("tool=get_sales_summary user=%s range=%s/%s", ctx.context.user_id, start, end)
 
     row = (await db.execute(
         select(
@@ -103,9 +105,8 @@ async def get_sales_summary(ctx: RunContextWrapper[PharmacyContext], date_range:
 async def get_expenses_summary(ctx: RunContextWrapper[PharmacyContext], date_range: str) -> str:
     """Get total expenses broken down by account for a time period."""
     db = ctx.context.db
-    user_id = ctx.context.user_id
     start, end = _parse_date_range(date_range)
-    logger.info("tool=get_expenses_summary user=%s range=%s/%s", user_id, start, end)
+    logger.info("tool=get_expenses_summary user=%s range=%s/%s", ctx.context.user_id, start, end)
 
     rows = (await db.execute(
         select(
@@ -136,8 +137,7 @@ async def get_expenses_summary(ctx: RunContextWrapper[PharmacyContext], date_ran
 async def get_account_balance(ctx: RunContextWrapper[PharmacyContext], account_name: str) -> str:
     """Get the current running balance of an account, matched by name (fuzzy — spoken input is fine)."""
     db = ctx.context.db
-    user_id = ctx.context.user_id
-    logger.info("tool=get_account_balance user=%s account=%r", user_id, account_name)
+    logger.info("tool=get_account_balance user=%s account=%r", ctx.context.user_id, account_name)
 
     account = (await db.execute(
         select(ChartOfAccount).where(
@@ -165,9 +165,8 @@ async def get_account_balance(ctx: RunContextWrapper[PharmacyContext], account_n
 async def get_profit_summary(ctx: RunContextWrapper[PharmacyContext], date_range: str) -> str:
     """Get net profit (revenue minus expenses) for a time period."""
     db = ctx.context.db
-    user_id = ctx.context.user_id
     start, end = _parse_date_range(date_range)
-    logger.info("tool=get_profit_summary user=%s range=%s/%s", user_id, start, end)
+    logger.info("tool=get_profit_summary user=%s range=%s/%s", ctx.context.user_id, start, end)
 
     revenue = Decimal(str((await db.execute(
         select(func.coalesce(func.sum(Sale.total_amount), 0)).where(
@@ -199,14 +198,13 @@ async def get_profit_summary(ctx: RunContextWrapper[PharmacyContext], date_range
 
 @function_tool
 async def get_low_stock_medicines(ctx: RunContextWrapper[PharmacyContext]) -> str:
-    """Get medicines that are running low on stock."""
+    """Get medicines that are running low on stock (below 10 units)."""
     db = ctx.context.db
-    user_id = ctx.context.user_id
-    logger.info("tool=get_low_stock_medicines user=%s", user_id)
+    logger.info("tool=get_low_stock_medicines user=%s", ctx.context.user_id)
 
     rows = (await db.execute(
         select(Medicine.name, Medicine.stock, Medicine.company)
-        .where(Medicine.stock < LOW_STOCK_THRESHOLD, Medicine.stock >= 0)
+        .where(Medicine.stock < LOW_STOCK_THRESHOLD, Medicine.stock > 0)
         .order_by(Medicine.stock.asc())
         .limit(20)
     )).all()
@@ -214,7 +212,7 @@ async def get_low_stock_medicines(ctx: RunContextWrapper[PharmacyContext]) -> st
     if not rows:
         return f"All medicines have sufficient stock (above {LOW_STOCK_THRESHOLD} units)."
 
-    lines = [f"  {r.name}: {r.stock} units" for r in rows]
+    lines = [f"  {r.name}: {r.stock} units" + (f" ({r.company})" if r.company else "") for r in rows]
     return f"{len(rows)} medicine(s) low on stock (below {LOW_STOCK_THRESHOLD}):\n" + "\n".join(lines)
 
 
@@ -224,10 +222,9 @@ async def get_top_selling_medicines(
 ) -> str:
     """Get the top-selling medicines by quantity sold for a time period."""
     db = ctx.context.db
-    user_id = ctx.context.user_id
     start, end = _parse_date_range(date_range)
     limit = max(1, min(limit, 20))
-    logger.info("tool=get_top_selling_medicines user=%s range=%s/%s limit=%d", user_id, start, end, limit)
+    logger.info("tool=get_top_selling_medicines user=%s range=%s/%s limit=%d", ctx.context.user_id, start, end, limit)
 
     rows = (await db.execute(
         select(
@@ -256,17 +253,284 @@ async def get_top_selling_medicines(
     return f"Top {len(rows)} medicines for {date_range}:\n" + "\n".join(lines)
 
 
+# ── New inventory tools ───────────────────────────────────────────────────────
+
+@function_tool
+async def get_stock_by_company(ctx: RunContextWrapper[PharmacyContext], company_name: str) -> str:
+    """Get total products and stock quantity for a specific manufacturer/company. Fuzzy match on company name — voice transcription input is fine."""
+    db = ctx.context.db
+    logger.info("tool=get_stock_by_company user=%s company=%r", ctx.context.user_id, company_name)
+
+    rows = (await db.execute(
+        select(
+            Medicine.company,
+            func.count(Medicine.id).label("product_count"),
+            func.coalesce(func.sum(Medicine.stock), 0).label("total_stock"),
+        )
+        .where(Medicine.company.ilike(f"%{company_name}%"))
+        .group_by(Medicine.company)
+        .order_by(func.count(Medicine.id).desc())
+    )).all()
+
+    if not rows:
+        all_companies = (await db.execute(
+            select(Medicine.company)
+            .where(Medicine.company.isnot(None))
+            .distinct()
+            .limit(50)
+        )).scalars().all()
+        suggestions = [c for c in all_companies if c and any(
+            word in c.lower() for word in company_name.lower().split() if len(word) > 2
+        )]
+        if suggestions:
+            return f"No company found matching '{company_name}'. Did you mean: {', '.join(suggestions[:3])}?"
+        return f"No company found matching '{company_name}'."
+
+    lines = [
+        f"  {r.company}: {r.product_count} product(s), {int(r.total_stock)} units in stock"
+        for r in rows
+    ]
+    return f"Company stock for '{company_name}':\n" + "\n".join(lines)
+
+
+@function_tool
+async def get_all_companies_summary(ctx: RunContextWrapper[PharmacyContext]) -> str:
+    """List all manufacturers/companies in inventory with product count and total stock quantity, sorted by product count."""
+    db = ctx.context.db
+    logger.info("tool=get_all_companies_summary user=%s", ctx.context.user_id)
+
+    rows = (await db.execute(
+        select(
+            Medicine.company,
+            func.count(Medicine.id).label("product_count"),
+            func.coalesce(func.sum(Medicine.stock), 0).label("total_stock"),
+        )
+        .where(Medicine.company.isnot(None))
+        .group_by(Medicine.company)
+        .order_by(func.count(Medicine.id).desc())
+    )).all()
+
+    no_company_count = (await db.execute(
+        select(func.count(Medicine.id)).where(Medicine.company.is_(None))
+    )).scalar_one()
+
+    if not rows and not no_company_count:
+        return "No medicines found in inventory."
+
+    lines = [
+        f"  {r.company}: {r.product_count} product(s), {int(r.total_stock)} units total"
+        for r in rows
+    ]
+    result = f"{len(rows)} company/companies in inventory:\n" + "\n".join(lines)
+    if no_company_count:
+        result += f"\n  (No company assigned): {no_company_count} product(s)"
+    return result
+
+
+@function_tool
+async def get_recently_restocked(ctx: RunContextWrapper[PharmacyContext], days: int = 7) -> str:
+    """Get medicines received and restocked in the last N days (default 7), based on Medicine Receiving records."""
+    db = ctx.context.db
+    days = max(1, min(days, 365))
+    cutoff = datetime.now(_PKT) - timedelta(days=days)
+    logger.info("tool=get_recently_restocked user=%s days=%d", ctx.context.user_id, days)
+
+    rows = (await db.execute(
+        select(
+            StockReceiving.medicine_name,
+            StockReceiving.quantity,
+            StockReceiving.received_at,
+            StockReceiving.company_invoice_no,
+            Medicine.company,
+        )
+        .join(Medicine, Medicine.id == StockReceiving.medicine_id)
+        .where(StockReceiving.received_at >= cutoff)
+        .order_by(StockReceiving.received_at.desc())
+        .limit(30)
+    )).all()
+
+    if not rows:
+        return f"No restocking activity in the last {days} day(s)."
+
+    lines = []
+    for r in rows:
+        date_str = r.received_at.astimezone(_PKT).strftime("%b %d")
+        company_str = f" ({r.company})" if r.company else ""
+        invoice_str = f", invoice {r.company_invoice_no}" if r.company_invoice_no else ""
+        lines.append(f"  {r.medicine_name}{company_str}: +{r.quantity} units on {date_str}{invoice_str}")
+    return f"{len(rows)} restock record(s) in the last {days} day(s):\n" + "\n".join(lines)
+
+
+@function_tool
+async def get_out_of_stock_medicines(ctx: RunContextWrapper[PharmacyContext]) -> str:
+    """Get all medicines currently at zero quantity (out of stock)."""
+    db = ctx.context.db
+    logger.info("tool=get_out_of_stock_medicines user=%s", ctx.context.user_id)
+
+    rows = (await db.execute(
+        select(Medicine.name, Medicine.company)
+        .where(Medicine.stock == 0)
+        .order_by(Medicine.name)
+    )).all()
+
+    if not rows:
+        return "No medicines are currently out of stock. All items have at least some stock."
+
+    lines = [
+        f"  {r.name}" + (f" ({r.company})" if r.company else "")
+        for r in rows
+    ]
+    return f"{len(rows)} medicine(s) out of stock:\n" + "\n".join(lines)
+
+
+@function_tool
+async def get_medicine_details(ctx: RunContextWrapper[PharmacyContext], medicine_name: str) -> str:
+    """Get full details for a specific medicine: stock, price, company, composition, and units sold in last 30 days. Fuzzy match on name."""
+    db = ctx.context.db
+    logger.info("tool=get_medicine_details user=%s name=%r", ctx.context.user_id, medicine_name)
+
+    med = (await db.execute(
+        select(Medicine)
+        .where(Medicine.name.ilike(f"%{medicine_name}%"))
+        .order_by(Medicine.name)
+        .limit(1)
+    )).scalar_one_or_none()
+
+    if not med:
+        first_word = medicine_name.split()[0] if medicine_name.split() else medicine_name
+        suggestions = (await db.execute(
+            select(Medicine.name)
+            .where(Medicine.name.ilike(f"%{first_word}%"))
+            .limit(5)
+        )).scalars().all()
+        if suggestions:
+            return f"No medicine found matching '{medicine_name}'. Did you mean: {', '.join(suggestions)}?"
+        return f"No medicine found matching '{medicine_name}'."
+
+    today = datetime.now(_PKT).date()
+    sold_30 = (await db.execute(
+        select(func.coalesce(func.sum(SaleItem.quantity), 0))
+        .join(Sale, Sale.id == SaleItem.sale_id)
+        .where(
+            SaleItem.medicine_id == med.id,
+            func.date(func.timezone('Asia/Karachi', Sale.created_at)) >= today - timedelta(days=30),
+        )
+    )).scalar_one()
+
+    parts = [
+        f"Medicine: {med.name}",
+        f"Stock: {med.stock} unit(s)",
+        f"Selling price: Rs. {med.price:,.2f}",
+    ]
+    if med.company:
+        parts.append(f"Company: {med.company}")
+    if med.composition:
+        parts.append(f"Composition: {med.composition}")
+    if med.type:
+        parts.append(f"Type: {med.type}")
+    if med.uom:
+        parts.append(f"Unit: {med.uom}")
+    parts.append(f"Sold in last 30 days: {int(sold_30)} unit(s)")
+    return "\n".join(parts)
+
+
+@function_tool
+async def get_stock_value_summary(ctx: RunContextWrapper[PharmacyContext]) -> str:
+    """Get total inventory value calculated as stock quantity times selling price, broken down by company."""
+    db = ctx.context.db
+    logger.info("tool=get_stock_value_summary user=%s", ctx.context.user_id)
+
+    rows = (await db.execute(
+        select(
+            Medicine.company,
+            func.count(Medicine.id).label("products"),
+            func.coalesce(func.sum(Medicine.stock * Medicine.price), 0).label("value"),
+        )
+        .group_by(Medicine.company)
+        .order_by(func.sum(Medicine.stock * Medicine.price).desc())
+    )).all()
+
+    if not rows:
+        return "No medicines found in inventory."
+
+    total = sum(Decimal(str(r.value or 0)) for r in rows)
+    lines = [
+        f"  {r.company or 'No company'}: Rs. {Decimal(str(r.value or 0)):,.2f} ({r.products} product(s))"
+        for r in rows
+    ]
+    return (
+        f"Total inventory value: Rs. {total:,.2f} (at selling prices — cost price not tracked)\n"
+        + "\n".join(lines)
+    )
+
+
+@function_tool
+async def get_slow_moving_medicines(ctx: RunContextWrapper[PharmacyContext], days: int = 30) -> str:
+    """Get medicines that are in stock but have had zero sales in the last N days (default 30). Useful for identifying dead stock."""
+    db = ctx.context.db
+    days = max(1, min(days, 365))
+    cutoff = datetime.now(_PKT).date() - timedelta(days=days)
+    logger.info("tool=get_slow_moving_medicines user=%s days=%d", ctx.context.user_id, days)
+
+    sold_subq = (
+        select(
+            SaleItem.medicine_id,
+            func.sum(SaleItem.quantity).label("sold"),
+        )
+        .join(Sale, Sale.id == SaleItem.sale_id)
+        .where(func.date(func.timezone('Asia/Karachi', Sale.created_at)) >= cutoff)
+        .group_by(SaleItem.medicine_id)
+        .subquery()
+    )
+
+    rows = (await db.execute(
+        select(
+            Medicine.name,
+            Medicine.stock,
+            Medicine.company,
+            func.coalesce(sold_subq.c.sold, 0).label("sold"),
+        )
+        .outerjoin(sold_subq, sold_subq.c.medicine_id == Medicine.id)
+        .where(
+            Medicine.stock > 0,
+            func.coalesce(sold_subq.c.sold, 0) == 0,
+        )
+        .order_by(Medicine.stock.desc())
+        .limit(25)
+    )).all()
+
+    if not rows:
+        return f"All in-stock medicines have had at least some sales in the last {days} day(s). No dead stock detected."
+
+    lines = [
+        f"  {r.name}: {r.stock} units in stock, 0 sold in {days} days"
+        + (f" ({r.company})" if r.company else "")
+        for r in rows
+    ]
+    return (
+        f"{len(rows)} slow-moving medicine(s) — in stock but no sales in last {days} days:\n"
+        + "\n".join(lines)
+    )
+
+
+# ── Agent ─────────────────────────────────────────────────────────────────────
+
 _AGENT: Agent[PharmacyContext] = Agent(
     name="Pharmacy Business Assistant",
     model="gpt-4o-mini",
     instructions=(
-        "You are a concise pharmacy business assistant. "
-        "Answer questions about sales, expenses, profit, inventory, and account balances using your tools. "
+        "You are a concise pharmacy business assistant for PharmaCare. "
+        "You can answer questions about: sales, expenses, profit, account balances, "
+        "inventory stock levels, medicines by company/manufacturer, out-of-stock items, "
+        "recently restocked items, slow-moving or dead stock, stock value, "
+        "and detailed information about any specific medicine. "
         "Always state amounts in Pakistani Rupees (Rs.). "
         "Keep answers short and conversational — they will be read aloud. "
         "Do not use markdown, bullet symbols, or formatting characters. "
         "IMPORTANT: Always respond in English only, regardless of what language the user speaks in. "
-        "If asked something outside pharmacy business data, politely say you can only help with business queries."
+        "If asked something outside pharmacy business data, politely say you can only help with business queries. "
+        "Note: expiry dates, batch numbers, and supplier names are not currently tracked in this system — "
+        "say so clearly if asked about them."
     ),
     tools=[
         get_sales_summary,
@@ -275,9 +539,18 @@ _AGENT: Agent[PharmacyContext] = Agent(
         get_profit_summary,
         get_low_stock_medicines,
         get_top_selling_medicines,
+        get_stock_by_company,
+        get_all_companies_summary,
+        get_recently_restocked,
+        get_out_of_stock_medicines,
+        get_medicine_details,
+        get_stock_value_summary,
+        get_slow_moving_medicines,
     ],
 )
 
+
+# ── Pipeline helpers ──────────────────────────────────────────────────────────
 
 @dataclass
 class PipelineResult:
@@ -285,7 +558,6 @@ class PipelineResult:
     response_text: str
     audio_base64: str
 
-# Legacy alias
 VoicePipelineResult = PipelineResult
 
 
@@ -296,7 +568,6 @@ async def run_voice_pipeline(
 ) -> VoicePipelineResult:
     client = _get_client()
 
-    # STT — Whisper
     buf = BytesIO(audio_bytes)
     buf.name = "audio.webm"
     transcription = await client.audio.transcriptions.create(model="whisper-1", file=buf)
@@ -315,7 +586,6 @@ async def run_voice_pipeline(
 
     logger.info("TTS user=%s response=%r", user_id, response_text[:100])
 
-    # TTS — OpenAI speech
     tts_resp = await client.audio.speech.create(
         model="tts-1",
         voice="nova",
