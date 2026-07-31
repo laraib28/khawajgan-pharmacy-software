@@ -24,7 +24,7 @@ interface SlipProps {
 export default function Slip({ invoice }: SlipProps) {
   if (!invoice) return null;
 
-  const pharmacyName = process.env.NEXT_PUBLIC_PHARMACY_NAME ?? 'Khawajgan Pharmacy';
+  const pharmacyName = process.env.NEXT_PUBLIC_PHARMACY_NAME ?? 'PharmaCare';
 
   let date = '';
   try {
@@ -50,15 +50,7 @@ export default function Slip({ invoice }: SlipProps) {
       padding: '12px',
       margin: '0 auto',
     }}>
-      {/* Header with logo */}
-      <div style={{ textAlign: 'center', marginBottom: '6px' }}>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/logo-khawajgan.png" alt="Logo" style={{ width: '60px', height: '60px', objectFit: 'contain' }} />
-      </div>
-      <div style={{ textAlign: 'center', fontWeight: 'bold', fontSize: '13px', marginBottom: '2px' }}>
-        Tanzeem-e-Khawajgan Medical Center
-      </div>
-      <div style={{ textAlign: 'center', fontWeight: 'bold', fontSize: '12px', marginBottom: '4px' }}>
+      <div style={{ textAlign: 'center', fontWeight: 'bold', fontSize: '14px', marginBottom: '4px' }}>
         {pharmacyName}
       </div>
       <div style={{ textAlign: 'center', fontSize: '11px', marginBottom: '8px' }}>

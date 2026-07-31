@@ -41,7 +41,7 @@ export default function LoginPage() {
       <div style={{ width: '380px', background: '#fff', borderRadius: '12px', padding: '36px', boxShadow: '0 4px 24px rgba(0,0,0,0.08)', border: '1px solid #e2e8f0' }}>
         <h1 style={{ fontSize: '22px', fontWeight: 800, color: '#0f172a', marginBottom: '4px', textAlign: 'center' }}>Sign in</h1>
         <p style={{ fontSize: '13px', color: '#64748b', textAlign: 'center', marginBottom: '28px' }}>
-          Tanzeem-e-Khawajgan Medical Center
+          PharmaCare
         </p>
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
