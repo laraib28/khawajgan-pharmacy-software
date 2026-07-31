@@ -1,6 +1,6 @@
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
-from sqlalchemy import CheckConstraint, DateTime, Numeric, String, Integer, func
+from sqlalchemy import CheckConstraint, Date, DateTime, Numeric, String, Integer, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database import Base
 
@@ -20,6 +20,9 @@ class Medicine(Base):
     composition: Mapped[str | None] = mapped_column(String(500), nullable=True)
     type: Mapped[str | None] = mapped_column(String(100), nullable=True)
     uom: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    expiry_date: Mapped[date | None] = mapped_column(Date(), nullable=True)
+    batch_number: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    cost_price: Mapped[Decimal | None] = mapped_column(Numeric(10, 2), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

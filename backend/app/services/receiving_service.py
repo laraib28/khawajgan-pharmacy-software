@@ -28,11 +28,13 @@ async def create_receiving(
     medicine_name: str,
     quantity: int,
     company_invoice_no: Optional[str] = None,
+    supplier_name: Optional[str] = None,
 ) -> StockReceiving:
     invoice_no = await _generate_invoice_no(db)
     record = StockReceiving(
         invoice_no=invoice_no,
         company_invoice_no=company_invoice_no or None,
+        supplier_name=supplier_name or None,
         medicine_id=medicine_id,
         medicine_name=medicine_name,
         quantity=quantity,
@@ -48,6 +50,7 @@ async def restock_medicine(
     medicine_id: int,
     quantity: int,
     company_invoice_no: Optional[str] = None,
+    supplier_name: Optional[str] = None,
     created_by_id: Optional[int] = None,
     unit_price: Optional[Decimal] = None,
 ) -> StockReceiving:
@@ -66,6 +69,7 @@ async def restock_medicine(
         medicine_name=medicine.name,
         quantity=quantity,
         company_invoice_no=company_invoice_no,
+        supplier_name=supplier_name,
     )
 
     if created_by_id is not None:

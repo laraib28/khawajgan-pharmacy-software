@@ -24,5 +24,6 @@ async def add_receiving(
 ):
     return await receiving_service.restock_medicine(
         db, data.medicine_id, data.quantity, data.company_invoice_no,
+        supplier_name=data.supplier_name,
         created_by_id=current_user.id,
     )

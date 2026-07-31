@@ -15,6 +15,7 @@ interface StockReceiving {
   id: number;
   invoice_no: string;
   company_invoice_no: string | null;
+  supplier_name: string | null;
   medicine_id: number;
   medicine_name: string;
   quantity: number;
@@ -31,7 +32,7 @@ export default function ReceivingPage() {
   const [receivings, setReceivings] = useState<StockReceiving[]>([]);
   const [medicines, setMedicines] = useState<Medicine[]>([]);
   const [loading, setLoading] = useState(true);
-  const [form, setForm] = useState({ medicine_id: '', quantity: '', company_invoice_no: '' });
+  const [form, setForm] = useState({ medicine_id: '', quantity: '', company_invoice_no: '', supplier_name: '' });
   const [formError, setFormError] = useState('');
   const [formLoading, setFormLoading] = useState(false);
   const [lastReceiving, setLastReceiving] = useState<StockReceiving | null>(null);
@@ -63,9 +64,10 @@ export default function ReceivingPage() {
         medicine_id: Number(form.medicine_id),
         quantity: Number(form.quantity),
         company_invoice_no: form.company_invoice_no.trim() || null,
+        supplier_name: form.supplier_name.trim() || null,
       });
       setLastReceiving(res);
-      setForm({ medicine_id: '', quantity: '', company_invoice_no: '' });
+      setForm({ medicine_id: '', quantity: '', company_invoice_no: '', supplier_name: '' });
       await fetchData();
     } catch (e: unknown) {
       setFormError(e instanceof Error ? e.message : 'Restock failed');
@@ -78,7 +80,12 @@ export default function ReceivingPage() {
 
   return (
     <div>
-      <h1 style={{ fontSize: '22px', fontWeight: 700, marginBottom: '20px' }}>Medicine Receiving</h1>
+      <h1 style={{ fontSize: '22px', fontWeight: 700, marginBottom: '16px' }}>Medicine Receiving</h1>
+
+      {/* Data completeness notice */}
+      <div style={{ background: '#fefce8', border: '1px solid #fde047', borderRadius: '8px', padding: '10px 14px', marginBottom: '20px', fontSize: '13px', color: '#854d0e' }}>
+        <strong>Note:</strong> Supplier name is a new field. Older receiving records will not have it — please record it for all new stock deliveries going forward.
+      </div>
 
       {/* Restock Form */}
       <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '16px', marginBottom: '24px' }}>
@@ -101,6 +108,13 @@ export default function ReceivingPage() {
             value={form.quantity}
             onChange={e => setForm(f => ({ ...f, quantity: e.target.value }))}
             style={{ padding: '8px', border: '1px solid #cbd5e1', borderRadius: '4px', width: '120px' }}
+          />
+          <input
+            type="text"
+            placeholder="Supplier Name"
+            value={form.supplier_name}
+            onChange={e => setForm(f => ({ ...f, supplier_name: e.target.value }))}
+            style={{ padding: '8px', border: '1px solid #cbd5e1', borderRadius: '4px', width: '180px' }}
           />
           <input
             type="text"
@@ -128,14 +142,18 @@ export default function ReceivingPage() {
         {lastReceiving && (
           <div style={{ marginTop: '10px', background: '#f0fdf4', border: '1px solid #86efac', borderRadius: '6px', padding: '10px 14px' }}>
             <div style={{ fontWeight: 600, color: '#166534', fontSize: '13px', marginBottom: '4px' }}>Stock successfully received!</div>
-            <div style={{ fontSize: '13px', color: '#15803d' }}>
+            <div style={{ fontSize: '13px', color: '#15803d', display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
               <span>Medicine: <strong>{lastReceiving.medicine_name}</strong></span>
-              <span style={{ margin: '0 12px' }}>|</span>
+              <span style={{ margin: '0 8px' }}>|</span>
               <span>Qty: <strong>+{lastReceiving.quantity}</strong></span>
-              <span style={{ margin: '0 12px' }}>|</span>
+              <span style={{ margin: '0 8px' }}>|</span>
               <span>Invoice: <strong>{lastReceiving.invoice_no}</strong></span>
+              {lastReceiving.supplier_name && (
+                <><span style={{ margin: '0 8px' }}>|</span>
+                <span>Supplier: <strong>{lastReceiving.supplier_name}</strong></span></>
+              )}
               {lastReceiving.company_invoice_no && (
-                <><span style={{ margin: '0 12px' }}>|</span>
+                <><span style={{ margin: '0 8px' }}>|</span>
                 <span>Company Invoice: <strong>{lastReceiving.company_invoice_no}</strong></span></>
               )}
             </div>
@@ -151,28 +169,32 @@ export default function ReceivingPage() {
         ) : receivings.length === 0 ? (
           <div style={{ color: '#94a3b8', padding: '16px', textAlign: 'center' }}>Koi receiving record nahi mila</div>
         ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
-            <thead>
-              <tr style={{ background: '#e2e8f0' }}>
-                <th style={{ padding: '8px', textAlign: 'left' }}>Invoice No</th>
-                <th style={{ padding: '8px', textAlign: 'left' }}>Company Invoice</th>
-                <th style={{ padding: '8px', textAlign: 'left' }}>Medicine</th>
-                <th style={{ padding: '8px', textAlign: 'right' }}>Quantity</th>
-                <th style={{ padding: '8px', textAlign: 'left' }}>Date</th>
-              </tr>
-            </thead>
-            <tbody>
-              {receivings.map(r => (
-                <tr key={r.id} style={{ borderBottom: '1px solid #e2e8f0' }}>
-                  <td style={{ padding: '8px', fontFamily: 'monospace', fontSize: '12px' }}>{r.invoice_no}</td>
-                  <td style={{ padding: '8px', color: '#64748b' }}>{r.company_invoice_no ?? '—'}</td>
-                  <td style={{ padding: '8px', fontWeight: 500 }}>{r.medicine_name}</td>
-                  <td style={{ padding: '8px', textAlign: 'right', color: '#059669', fontWeight: 600 }}>+{r.quantity}</td>
-                  <td style={{ padding: '8px', fontSize: '12px', color: '#64748b' }}>{formatDate(r.received_at)}</td>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', minWidth: '600px', borderCollapse: 'collapse', fontSize: '14px' }}>
+              <thead>
+                <tr style={{ background: '#e2e8f0' }}>
+                  <th style={{ padding: '8px', textAlign: 'left' }}>Invoice No</th>
+                  <th style={{ padding: '8px', textAlign: 'left' }}>Medicine</th>
+                  <th style={{ padding: '8px', textAlign: 'left' }}>Supplier</th>
+                  <th style={{ padding: '8px', textAlign: 'left' }}>Company Invoice</th>
+                  <th style={{ padding: '8px', textAlign: 'right' }}>Quantity</th>
+                  <th style={{ padding: '8px', textAlign: 'left' }}>Date</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {receivings.map(r => (
+                  <tr key={r.id} style={{ borderBottom: '1px solid #e2e8f0' }}>
+                    <td style={{ padding: '8px', fontFamily: 'monospace', fontSize: '12px' }}>{r.invoice_no}</td>
+                    <td style={{ padding: '8px', fontWeight: 500 }}>{r.medicine_name}</td>
+                    <td style={{ padding: '8px', color: r.supplier_name ? '#1e40af' : '#94a3b8' }}>{r.supplier_name ?? '—'}</td>
+                    <td style={{ padding: '8px', color: '#64748b' }}>{r.company_invoice_no ?? '—'}</td>
+                    <td style={{ padding: '8px', textAlign: 'right', color: '#059669', fontWeight: 600 }}>+{r.quantity}</td>
+                    <td style={{ padding: '8px', fontSize: '12px', color: '#64748b' }}>{formatDate(r.received_at)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
     </div>

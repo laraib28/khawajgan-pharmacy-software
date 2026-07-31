@@ -13,6 +13,7 @@ class StockReceiving(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     invoice_no: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
     company_invoice_no: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    supplier_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     medicine_id: Mapped[int] = mapped_column(ForeignKey("medicines.id"), nullable=False)
     medicine_name: Mapped[str] = mapped_column(String(255), nullable=False)
     quantity: Mapped[int] = mapped_column(Integer, nullable=False)

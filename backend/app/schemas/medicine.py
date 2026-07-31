@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Optional
 from pydantic import BaseModel, Field
@@ -13,6 +13,9 @@ class MedicineCreate(BaseModel):
     type: Optional[str] = Field(None, max_length=100)
     uom: Optional[str] = Field(None, max_length=50)
     company_invoice_no: Optional[str] = Field(None, max_length=100)
+    expiry_date: Optional[date] = None
+    batch_number: Optional[str] = Field(None, max_length=100)
+    cost_price: Optional[Decimal] = Field(None, ge=0)
 
 
 class MedicineUpdate(BaseModel):
@@ -29,6 +32,9 @@ class MedicineOut(BaseModel):
     composition: Optional[str]
     type: Optional[str]
     uom: Optional[str]
+    expiry_date: Optional[date]
+    batch_number: Optional[str]
+    cost_price: Optional[Decimal]
     created_at: datetime
     updated_at: Optional[datetime]
 

@@ -9,6 +9,9 @@ interface Medicine {
   price: number;
   stock: number;
   company: string | null;
+  expiry_date: string | null;
+  batch_number: string | null;
+  cost_price: number | null;
   updated_at: string | null;
 }
 
@@ -146,25 +149,39 @@ export default function MedicineTable({ medicines, onUpdated }: MedicineTablePro
       {error && <div style={{ color: '#ef4444', marginBottom: '8px' }}>{error}</div>}
 
       <div style={{ overflowX: 'auto' }}>
-      <table style={{ width: '100%', minWidth: '640px', borderCollapse: 'collapse', fontSize: '14px' }}>
+      <table style={{ width: '100%', minWidth: '900px', borderCollapse: 'collapse', fontSize: '14px' }}>
         <thead>
           <tr style={{ background: '#e2e8f0' }}>
             <th style={{ padding: '8px', textAlign: 'left' }}>Name</th>
-            <th style={{ padding: '8px', textAlign: 'right' }}>Price</th>
+            <th style={{ padding: '8px', textAlign: 'right' }}>Sell Price</th>
+            <th style={{ padding: '8px', textAlign: 'right' }}>Cost Price</th>
             <th style={{ padding: '8px', textAlign: 'right' }}>Stock</th>
             <th style={{ padding: '8px', textAlign: 'left' }}>Company</th>
+            <th style={{ padding: '8px', textAlign: 'left' }}>Batch</th>
+            <th style={{ padding: '8px', textAlign: 'left' }}>Expiry</th>
             <th style={{ padding: '8px', textAlign: 'left' }}>Last Updated</th>
             <th style={{ padding: '8px' }}>Actions</th>
           </tr>
         </thead>
         <tbody>
-          {filtered.map(m => (
+          {filtered.map(m => {
+            const today = new Date();
+            const expiry = m.expiry_date ? new Date(m.expiry_date) : null;
+            const daysToExpiry = expiry ? Math.ceil((expiry.getTime() - today.getTime()) / 86400000) : null;
+            const expiryStyle: React.CSSProperties =
+              daysToExpiry !== null && daysToExpiry < 0 ? { color: '#dc2626', fontWeight: 600 } :
+              daysToExpiry !== null && daysToExpiry <= 90 ? { color: '#d97706', fontWeight: 600 } :
+              { color: '#475569' };
+            return (
             <tr key={m.id} style={{ borderBottom: '1px solid #e2e8f0', background: m.stock === 0 ? '#fee2e2' : m.stock <= 10 ? '#fef3c7' : undefined }}>
               <td style={{ padding: '8px' }}>{m.name}</td>
               <td style={{ padding: '8px', textAlign: 'right' }}>
                 {editId === m.id
                   ? <input type="number" value={editPrice} onChange={e => setEditPrice(e.target.value)} style={{ width: '80px', padding: '4px' }} />
                   : `Rs. ${Number(m.price).toFixed(2)}`}
+              </td>
+              <td style={{ padding: '8px', textAlign: 'right', color: m.cost_price != null ? '#475569' : '#94a3b8' }}>
+                {m.cost_price != null ? `Rs. ${Number(m.cost_price).toFixed(2)}` : '—'}
               </td>
               <td style={{ padding: '8px', textAlign: 'right' }}>
                 {editId === m.id
@@ -174,6 +191,16 @@ export default function MedicineTable({ medicines, onUpdated }: MedicineTablePro
                     : m.stock}
               </td>
               <td style={{ padding: '8px' }}>{m.company ?? '—'}</td>
+              <td style={{ padding: '8px', fontSize: '12px', color: '#64748b' }}>{m.batch_number ?? '—'}</td>
+              <td style={{ padding: '8px', fontSize: '12px', ...expiryStyle }}>
+                {m.expiry_date
+                  ? daysToExpiry! < 0
+                    ? `${m.expiry_date} (expired)`
+                    : daysToExpiry! <= 90
+                      ? `${m.expiry_date} (${daysToExpiry}d)`
+                      : m.expiry_date
+                  : <span style={{ color: '#94a3b8' }}>—</span>}
+              </td>
               <td style={{ padding: '8px', fontSize: '12px', color: '#64748b' }}>{formatDate(m.updated_at)}</td>
               <td style={{ padding: '8px', textAlign: 'center', whiteSpace: 'nowrap' }}>
                 {editId === m.id ? (
@@ -191,9 +218,10 @@ export default function MedicineTable({ medicines, onUpdated }: MedicineTablePro
                 )}
               </td>
             </tr>
-          ))}
+            );
+          })}
           {filtered.length === 0 && (
-            <tr><td colSpan={6} style={{ padding: '16px', textAlign: 'center', color: '#94a3b8' }}>No medicines found</td></tr>
+            <tr><td colSpan={9} style={{ padding: '16px', textAlign: 'center', color: '#94a3b8' }}>No medicines found</td></tr>
           )}
         </tbody>
       </table>

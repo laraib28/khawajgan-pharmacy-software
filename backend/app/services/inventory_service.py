@@ -42,6 +42,9 @@ async def create_medicine(db: AsyncSession, data: MedicineCreate) -> dict:
         composition=data.composition,
         type=data.type,
         uom=data.uom,
+        expiry_date=data.expiry_date,
+        batch_number=data.batch_number,
+        cost_price=data.cost_price,
     )
     db.add(medicine)
     await db.flush()
